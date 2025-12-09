@@ -13,7 +13,55 @@ hide_st_style = """
             header {visibility: hidden;}
             </style>
             """
-st.markdown(hide_st_style, unsafe_allow_html=True)
+# --- STYLING START ---
+st.markdown("""
+<style>
+    /* 1. Haal de standaard Streamlit balken weg */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* 2. Achtergrond en spatiëring strak trekken */
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+
+    /* 3. De upload knop (Drag & Drop vak) */
+    [data-testid='stFileUploader'] {
+        width: 100%;
+        margin-bottom: 20px;
+    }
+
+    /* 4. De Actie-knop (Groot en Oranje/Rood) */
+    div.stButton > button {
+        width: 100%;
+        background-color: #FF4B4B;
+        color: white;
+        font-size: 20px;
+        font-weight: 700;
+        padding: 15px 0px;
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: all 0.3s;
+    }
+    
+    /* Hover effect (als je muis erop staat) */
+    div.stButton > button:hover {
+        background-color: #D43F3F;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 8px rgba(0,0,0,0.2);
+        color: white;
+    }
+
+    /* 5. Resultaat vakken mooier maken */
+    div[data-testid="stMarkdownContainer"] h3 {
+        color: #FF4B4B;
+    }
+</style>
+""", unsafe_allow_html=True)
+# --- STYLING END ---
 
 # 2. Titel en Intro
 st.title("📩 Snap-mijn-Brief")
