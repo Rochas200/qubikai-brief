@@ -22,6 +22,7 @@ st.write("Maak een foto van je brief. Wij vertellen je binnen 10 seconden wat je
 # 3. API Key ophalen (veilig via Secrets, leg ik zo uit)
 # Voor nu kun je hem even testen door hem hier in te vullen, maar voor livegang gebruiken we secrets.
 api_key = st.secrets["OPENAI_API_KEY"]
+client = OpenAI(api_key=api_key)
 # 4. De Upload Knop
 uploaded_file = st.file_uploader("Upload hier je brief (Foto of PDF)", type=['png', 'jpg', 'jpeg'])
 
