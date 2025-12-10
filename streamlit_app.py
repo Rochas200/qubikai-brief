@@ -33,7 +33,7 @@ model = genai.GenerativeModel('gemini-1.5-flash')
 
 # 3. INTERFACE
 st.title("📩 Snap-mijn-Brief")
-st.write("Upload je brief. Google Gemini analyseert hem direct.")
+st.write("Upload je brief. Qubikai analyseert hem direct.")
 
 uploaded_file = st.file_uploader("Kies foto of PDF", type=['jpg', 'jpeg', 'png'])
 
