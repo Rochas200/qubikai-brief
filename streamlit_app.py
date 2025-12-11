@@ -4,43 +4,61 @@ from PIL import Image
 import base64
 import io
 
-# 1. SETUP
-st.set_page_config(page_title="Qubikai Brief", page_icon="📩")
+# 1. SETUP & CONFIGURATIE ⚙️
+st.set_page_config(page_title="Qubikai Brief", page_icon="📩", layout="centered")
 
-# --- DE COLOR FIX ---
-# Hier dwingen we ZWART lettertype af op de WITTE achtergrond
+# --- DE DARK MODE STYLING ---
+# We maken een strakke, donkere interface.
 st.markdown("""
 <style>
-    /* Forceer de hele app naar wit met donkere tekst */
+    /* 1. De Hoofdachtergrond: Donker (Qubikai Dark) */
     .stApp {
-        background-color: #FFFFFF !important;
+        background-color: #111827 !important;
+        color: #FFFFFF !important;
     }
     
-    /* Zorg dat alle tekst (paragrafen, koppen, lijstjes) donkergrijs zijn */
+    /* 2. Alle tekst wit maken */
     p, h1, h2, h3, h4, h5, h6, li, span, div, label {
-        color: #111827 !important;
+        color: #FFFFFF !important;
     }
     
-    /* Zorg dat de spinner ook zichtbaar is */
-    div.stSpinner > div {
-        border-top-color: #4B0082 !important;
+    /* 3. De Upload Box mooi maken (zodat tekst leesbaar is) */
+    div[data-testid="stFileUploader"] {
+        background-color: #1F2937;
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px dashed #4B0082;
     }
     
-    /* Knoppen styling */
+    /* 4. De Knoppen (Rood accent) */
     div.stButton > button {
         background-color: #FF4B4B !important; 
-        color: white !important; 
+        color: white !important;
+        font-weight: bold;
         border: none;
         border-radius: 8px;
+        padding: 0.5rem 1rem;
+    }
+    
+    /* 5. De Spinner (Laden) */
+    div.stSpinner > div {
+        border-top-color: #FF4B4B !important;
+    }
+    
+    /* 6. Success meldingen stylen */
+    div.stAlert {
+        background-color: #1F2937 !important;
+        color: white !important;
+        border: 1px solid #059669;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# 2. CONFIGURATIE
+# 2. OPENAI VERBINDING 🔌
 try:
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 except:
-    st.error("⚠️ Systeemfout: API Key ontbreekt. Check de settings.")
+    st.error("⚠️ Setup Fout: Geen API Key gevonden.")
     st.stop()
 
 def encode_image(image):
@@ -48,46 +66,43 @@ def encode_image(image):
     image.save(buffered, format="JPEG")
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-# 3. INTERFACE
+# 3. DE INTERFACE (Voorkant) 📱
 st.title("📩 Snap-mijn-Brief")
-st.write("Brief van de overheid of een ingewikkelde rekening? Upload hem hieronder. Ik vertel je in gewone mensentaal wat je moet doen.")
+st.write("Upload een foto van je brief. Ik analyseer hem direct.")
 
-uploaded_file = st.file_uploader("Maak een foto of kies een bestand", type=['jpg', 'jpeg', 'png'])
+# Upload vak
+uploaded_file = st.file_uploader("Kies foto of maak een nieuwe", type=['jpg', 'jpeg', 'png'])
 
-# 4. INTELLIGENTIE
+# 4. DE INTELLIGENTIE (Agent) 🧠
 if uploaded_file:
+    # Toon de foto
     image = Image.open(uploaded_file)
-    st.image(image, width=300, caption="Jouw document")
+    st.image(image, caption="Jouw upload", width=300)
     
     st.markdown("---")
     
-    with st.spinner('🔍 Brief lezen en kleine lettertjes checken...'):
+    with st.spinner('🚀 Bezig met analyseren...'):
         try:
             base64_image = encode_image(image)
             
-            # --- JOUW AGENT SCRIPT ---
+            # De Qubikai Agent Prompt
             prompt_text = """
-            Jij bent de bureaucratie-expert van Qubikai. Je helpt mensen die post niet snappen.
-            Analyseer de afbeelding grondig (zoek naar datums, bedragen, afzenders en juridische taal).
-            
-            Geef je antwoord EXACT in dit format (gebruik Markdown):
+            Jij bent de bureaucratie-expert van Qubikai.
+            Bekijk de afbeelding en geef antwoord in dit exacte format (gebruik Markdown):
             
             ### 📄 1. Wat is dit?
-            (Eén zin in simpele taal. Bijvoorbeeld: "Dit is een verkeersboete voor te hard rijden.")
+            (Eén duidelijke zin)
             
-            ### 🚨 2. Moet ik iets doen?
-            * **Actie:** [JA / NEE]
+            ### 🚨 2. Actie & Deadline
+            * **Actie nodig:** [JA / NEE]
             * **Urgentie:** [HOOG / GEMIDDELD / LAAG]
-            * **Deadline:** [Datum indien gevonden, anders "Geen harde datum"]
+            * **Deadline:** [Datum of "Geen datum"]
             
-            ### 💶 3. Kosten?
-            (Staat er een bedrag? Zo ja: Hoeveel? Zo nee: "Geen kosten")
+            ### 💶 3. Kosten
+            (Bedrag of "Geen kosten")
             
-            ### 📝 4. Samenvatting
-            (De 3 belangrijkste punten in bulletpoints)
-            
-            ### 💡 5. Qubikai Advies
-            (Een vriendelijk, praktisch advies: "Betaal voor vrijdag via iDeal" of "Bewaar dit in je map".)
+            ### 💡 4. Qubikai Advies
+            (Kort, praktisch advies wat ik nu moet doen)
             """
             
             response = client.chat.completions.create(
@@ -106,17 +121,15 @@ if uploaded_file:
                         ],
                     }
                 ],
-                max_tokens=600,
+                max_tokens=500,
             )
             
             full_response = response.choices[0].message.content
             
-            # Succes melding (ook styling force)
-            st.success("✅ Analyse voltooid!")
-            
             # Resultaat tonen
+            st.success("Analyse voltooid!")
             st.markdown(full_response)
 
         except Exception as e:
-            st.error("Oeps, er ging iets mis bij de verwerking.")
-            st.info(f"Technische melding: {e}")
+            st.error("Oeps, er ging iets mis.")
+            st.info(f"Foutmelding: {e}")
