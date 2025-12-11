@@ -1,31 +1,71 @@
 import streamlit as st
 import google.generativeai as genai
+from PIL import Image
 
-st.title("🕵️‍♂️ De Model-Detective")
+# 1. SETUP
+st.set_page_config(page_title="Qubikai - Snap Brief", page_icon="📩")
 
-# 1. Configureer met je sleutel
+# Styling: Strak & Modern (Past bij je site)
+st.markdown("""
+<style>
+    .stApp {background-color: #FFFFFF;}
+    div.stButton > button {
+        width: 100%;
+        background-color: #FF4B4B;
+        color: white;
+        border-radius: 8px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# 2. CONFIGURATIE
 try:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 except:
-    st.error("Sleutel niet gevonden in Secrets!")
+    st.error("⚠️ Zet je GOOGLE_API_KEY in de Secrets!")
     st.stop()
 
-# 2. Vraag Google om de lijst
-st.write("Ik vraag nu aan Google welke modellen beschikbaar zijn voor jouw sleutel...")
+# KIES JE MODEL (Precies zoals in jouw lijstje!)
+# We pakken Flash voor snelheid. Wil je slimmer? Verander in 'models/gemini-1.5-pro-latest'
+model = genai.GenerativeModel('models/gemini-1.5-flash')
 
-try:
-    # We vragen de lijst op
-    model_list = genai.list_models()
+# 3. INTERFACE
+st.title("📩 Snap-mijn-Brief")
+st.write("Maak een foto van je brief. Ik vertel je direct wat je moet doen.")
+
+# Camera input voor mobiel gemak (of upload)
+uploaded_file = st.file_uploader("Kies foto of PDF", type=['jpg', 'jpeg', 'png'])
+
+# 4. LOGICA
+def analyze_image(img):
+    prompt = """
+    Jij bent de brief-expert van Qubikai. Analyseer deze afbeelding.
+    Geef antwoord in dit format:
     
-    found_any = False
-    for m in model_list:
-        # We laten alleen modellen zien die content kunnen genereren (zoals Gemini)
-        if 'generateContent' in m.supported_generation_methods:
-            st.success(f"✅ Gevonden: **{m.name}**")
-            found_any = True
+    1. **WAT IS DIT?** (1 zin, jip-en-janneke taal)
+    2. **ACTIE NODIG?** (JA/NEE + Deadline)
+    3. **SAMENVATTING** (De 3 belangrijkste punten)
+    4. **ADVIES** (Stap voor stap wat ik nu moet doen)
+    
+    Wees kort en direct.
+    """
+    response = model.generate_content([prompt, img])
+    return response.text
+
+# 5. AUTO-PILOT ACTIE (Geen knop meer nodig!)
+if uploaded_file is not None:
+    # Toon de foto klein
+    image = Image.open(uploaded_file)
+    st.image(image, caption='Jouw bestand', width=200)
+    
+    # Direct starten
+    with st.spinner('✨ Gemini is aan het lezen...'):
+        try:
+            resultaat = analyze_image(image)
+            st.success("Analyse klaar!")
+            st.markdown("---")
+            st.markdown(resultaat)
             
-    if not found_any:
-        st.warning("⚠️ Google reageert wel, maar geeft geen modellen terug. Check je API Key rechten!")
-        
-except Exception as e:
-    st.error(f"❌ Fout bij verbinden: {e}")
+        except Exception as e:
+            st.error("Oeps! Er ging iets mis.")
+            st.write(f"Technische fout: {e}")
