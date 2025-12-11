@@ -4,6 +4,7 @@ from PIL import Image
 import base64
 import io
 import os
+import time
 
 # ==========================================
 # 1. APP CONFIGURATIE (Rood voor Brief) 🔴
@@ -74,7 +75,6 @@ st.markdown(f"""
         border-left: 4px solid {ACCENT_COLOR};
         margin-top: 15px;
         margin-bottom: 20px;
-        font-size: 0.95em;
     }}
     
     /* BRIEF PAPIER LOOK */
@@ -108,36 +108,36 @@ except:
     st.stop()
 
 # ==========================================
-# 4. DE QUBIKAI MASTER PROMPTS (Jouw nieuwe brein) 🎓
+# 4. HULPFUNCTIES (Met de FIX!) 🛠️
 # ==========================================
 
+# DE "VEILIGE" RERUN FUNCTIE
+# Deze crasht niet, ongeacht welke versie je gebruikt.
+def force_rerun():
+    try:
+        st.rerun()
+    except AttributeError:
+        # Fallback voor oudere versies
+        st.experimental_rerun()
+
+def encode_image(image):
+    buffered = io.BytesIO()
+    image.save(buffered, format="JPEG")
+    return base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+# --- AGENT PROMPTS ---
 def get_agent_prompt(agent_role: str) -> str:
-    """
-    Hier zitten de systeem-instructies die je van de Architect hebt gekregen.
-    """
-    
     if agent_role.lower() == "analist":
         return """
 # SYSTEM PROMPT: DE JURIDISCH ANALIST
-
 ## 1. PERSONA
-Jij bent een Senior Juridisch Dossier Analist met 20 jaar ervaring. Jouw specialiteit is forensische documentanalyse.
-Jouw nauwkeurigheid is 100%. Jij hallucineert nooit feiten.
-
-## 2. CONTEXT ANALYSE & INSTRUCTIES
-Je ontvangt een afbeelding van een officiële brief.
-Jouw doel is het extraheren van de 'harde feiten'.
-
-## 3. REDENEERSTAPPEN
-1. Document Classificatie: Wat is dit voor brief?
-2. Entiteit Extractie: Zoek Afzender, Kenmerk, Dagtekening, Bedrag, Feit.
-3. Synthese: Vul de tabel in.
-
-## 4. OUTPUT FORMAAT
+Jij bent een Senior Juridisch Dossier Analist. Jouw specialiteit is documentanalyse.
+## 2. INSTRUCTIES
+Haal de harde feiten uit de brief.
+## 3. OUTPUT
 Geef **alleen** de onderstaande Markdown tabel terug.
 
 # ANALYSERAPPORT
-
 | Veld | Waarde |
 | :--- | :--- |
 | **Instantie** | [Naam Instantie] |
@@ -145,97 +145,47 @@ Geef **alleen** de onderstaande Markdown tabel terug.
 | **Beschikkingsnummer** | [Het nummer] |
 | **Datum Dagtekening** | [DD-MM-JJJJ] |
 | **Bedrag** | [€ 0,00] |
-| **Feit / Omschrijving** | [Korte omschrijving] |
-
-**Notitie Analist:** [Korte zin over leesbaarheid of urgentie.]
+| **Feit** | [Korte omschrijving] |
 """
-
     elif agent_role.lower() == "jurist":
         return """
 # SYSTEM PROMPT: DE ADVOCAAT BESTUURSRECHT
-
 ## 1. PERSONA
-Jij bent een doorgewinterde Advocaat Bestuursrecht. Je schrijft formeel, juridisch sterk, maar helder.
-
-## 2. CONTEXT ANALYSE
-Je ontvangt een ANALYSERAPPORT.
-Jouw taak is om deze feiten om te zetten in een formeel, 'pro forma' bezwaarschrift.
-
-## 3. STRATEGIE
-We maken 'pro forma' bezwaar om de termijn veilig te stellen en vragen om het dossier (art. 7:18 Awb) en uitstel voor de gronden.
-
-## 4. OUTPUT FORMAAT
-Schrijf de brief in Markdown.
-
-# CONCEPT BEZWAARSCHRIFT
-
-**Betreft:** Bezwaar tegen beschikking met kenmerk [BESCHIKKINGSNUMMER UIT INPUT]
-
-Edelachtbaar College / Geachte heer/mevrouw,
-
-Hierbij maak ik, [UW NAAM], wonende te [UW ADRES], tijdig bezwaar tegen de bovengenoemde beschikking d.d. [DATUM UIT INPUT] waarin mij een sanctie is opgelegd van [BEDRAG UIT INPUT] wegens [FEIT UIT INPUT].
-
-**Pro Forma Bezwaar**
-Op dit moment beschik ik niet over het volledige dossier om mijn bezwaren inhoudelijk te onderbouwen. Derhalve teken ik *pro forma* bezwaar aan.
-
-**Verzoek om stukken (Art. 7:18 Awb)**
-Om mijn bezwaar nader te kunnen motiveren, verzoek ik u mij – conform artikel 7:18 van de Algemene wet bestuursrecht – kosteloos alle op deze zaak betrekking hebbende stukken toe te zenden (zaakoverzicht, proces-verbaal, ijkrapporten, foto's).
-
-**Termijn voor gronden**
-Ik verzoek u mij een redelijke termijn te gunnen voor het indienen van de aanvullende gronden van het bezwaar, ingaande na ontvangst van de gevraagde stukken.
-
-In afwachting van de toezending van de stukken, verblijf ik,
-
-Hoogachtend,
-
-[UW NAAM]
-[UW BSN]
+Jij bent een Advocaat Bestuursrecht. Schrijf formeel maar helder.
+## 2. STRATEGIE
+Maak 'pro forma' bezwaar om de termijn veilig te stellen en vraag dossierstukken op.
+## 3. OUTPUT
+Schrijf een concept bezwaarschrift in Markdown met placeholders [NAAM], [ADRES].
+Verwijs naar Art 7:18 Awb (recht op stukken).
 """
     return ""
 
-# ==========================================
-# 5. DE AGENT FUNCTIES (De Uitvoering) 🏃‍♂️
-# ==========================================
-
-def encode_image(image):
-    buffered = io.BytesIO()
-    image.save(buffered, format="JPEG")
-    return base64.b64encode(buffered.getvalue()).decode('utf-8')
-
-# --- AGENT 1: DE ANALIST ---
+# --- AGENT FUNCTIES ---
 def agent_analyze(base64_image):
-    # Haal de slimme prompt op
     system_prompt = get_agent_prompt("analist")
-    
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_prompt},
-                {
-                    "role": "user", 
-                    "content": [
-                        {"type": "text", "text": "Hier is de foto van de brief. Maak het analyserapport."}, 
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                    ]
-                }
+                {"role": "user", "content": [
+                    {"type": "text", "text": "Analyseer deze brief."}, 
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                ]}
             ]
         )
         return response.choices[0].message.content
     except Exception as e:
         return f"Fout: {e}"
 
-# --- AGENT 2: DE JURIST ---
 def agent_write_letter(analysis_text):
-    # Haal de slimme prompt op
     system_prompt = get_agent_prompt("jurist")
-    
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Hier zijn de feiten uit het analyserapport:\n\n{analysis_text}"}
+                {"role": "user", "content": f"Hier zijn de feiten:\n\n{analysis_text}"}
             ]
         )
         return response.choices[0].message.content
@@ -243,7 +193,7 @@ def agent_write_letter(analysis_text):
         return f"Fout: {e}"
 
 # ==========================================
-# 6. PAGINA'S & FLOW 📱
+# 5. PAGINA'S & FLOW 📱
 # ==========================================
 
 # --- HEADER ---
@@ -251,7 +201,7 @@ c1, c2 = st.columns([1, 5])
 with c1:
     if st.button("🏠", help="Home"):
         st.session_state.page = 'home'
-        st.rerun()
+        force_rerun()
 with c2:
     st.markdown(f"<div class='nav-bar'>{APP_NAME}</div>", unsafe_allow_html=True)
 
@@ -266,7 +216,7 @@ if st.session_state.page == 'home':
     with c_b:
         if st.button("📸 SCAN MIJN BRIEF", type="primary"):
             st.session_state.page = 'upload'
-            st.rerun()
+            force_rerun()
 
 # --- UPLOAD ---
 elif st.session_state.page == 'upload':
@@ -275,18 +225,73 @@ elif st.session_state.page == 'upload':
     if uploaded_file:
         st.session_state.current_image = uploaded_file
         st.session_state.page = 'processing'
-        st.rerun()
+        force_rerun()
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("🔙 Terug"):
         st.session_state.page = 'home'
-        st.rerun()
+        force_rerun()
 
-# --- PROCESSING (AGENT 1) ---
+# --- PROCESSING ---
 elif st.session_state.page == 'processing':
     with st.spinner('🕵️‍♂️ Dossier Analist leest mee...'):
+        # Simpele vertraging voor UX
+        time.sleep(0.5)
         image = Image.open(st.session_state.current_image)
         base64_img = encode_image(image)
-        # Agent 1 aan het werk
+        
         st.session_state.analysis_result = agent_analyze(base64_img)
+        
         st.session_state.page = 'result'
-        st.rerun
+        force_rerun()
+
+# --- RESULTAAT ---
+elif st.session_state.page == 'result':
+    c_img, c_txt = st.columns([1, 2])
+    with c_img:
+        img = Image.open(st.session_state.current_image)
+        st.image(img, use_container_width=True, caption="Scan")
+    with c_txt:
+        st.markdown("### 📋 Analyserapport")
+        st.markdown('<div class="result-card">', unsafe_allow_html=True)
+        st.markdown(st.session_state.analysis_result)
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown("---")
+    st.write("### Wat wil je doen?")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        # ACTIE: Estafette naar Jurist
+        if st.button("✍️ Maak Pro-Forma Bezwaar"):
+            st.session_state.page = 'writing'
+            force_rerun()
+    with c2:
+        if st.button("✅ Ik regel het zelf"):
+             st.success("Top! Succes.")
+             
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("🔄 Nieuwe Scan"):
+        st.session_state.page = 'home'
+        force_rerun()
+
+# --- WRITING (JURIST) ---
+elif st.session_state.page == 'writing':
+    st.markdown("### ⚖️ De Advocaat schrijft...")
+    
+    if not st.session_state.generated_letter:
+        with st.spinner("Wetten en regels checken..."):
+            brief = agent_write_letter(st.session_state.analysis_result)
+            st.session_state.generated_letter = brief
+    
+    st.markdown('<div class="letter-paper">', unsafe_allow_html=True)
+    st.markdown(st.session_state.generated_letter)
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.info("💡 Tip: Kopieer deze tekst naar Word en vul je gegevens in.")
+    
+    if st.button("🔄 Begin Opnieuw"):
+        st.session_state.analysis_result = ""
+        st.session_state.generated_letter = ""
+        st.session_state.page = 'home'
+        force_rerun()
