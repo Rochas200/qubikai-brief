@@ -115,4 +115,8 @@ if uploaded_file:
             st.success("✅ Analyse voltooid!")
             
             # Resultaat tonen
-            st.markdown(full_response
+            st.markdown(full_response)
+
+        except Exception as e:
+            st.error("Oeps, er ging iets mis bij de verwerking.")
+            st.info(f"Technische melding: {e}")
