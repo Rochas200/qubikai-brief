@@ -29,7 +29,7 @@ except:
     st.stop()
 
 # Model kiezen (Flash is snel en goedkoop)
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-pro')
 
 # 3. INTERFACE
 st.title("📩 Snap-mijn-Brief")
