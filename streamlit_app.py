@@ -107,7 +107,7 @@ except:
     st.stop()
 
 # ==========================================
-# 4. DE AGENTS (DE ESTAFETTE) 🏃‍♂️💨
+# 4. DE INTELLIGENTE AGENTS 🕵️‍♂️👨‍⚖️
 # ==========================================
 
 def encode_image(image):
@@ -115,25 +115,31 @@ def encode_image(image):
     image.save(buffered, format="JPEG")
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-# --- AGENT 1: DE SPEURDER ---
+# --- AGENT 1: DE DOSSIER ANALIST ---
 def agent_analyze(base64_image):
     prompt = """
-    Jij bent de Post-Expert van Qubikai.
-    Analyseer dit document grondig.
+    Jij bent de Juridisch Analist van Qubikai.
+    Jouw enige taak is FEITEN verzamelen uit deze foto voor de advocaat.
+    
+    Zoek specifiek naar:
+    1. Datum van dagtekening.
+    2. Kenmerknummers (CJIB nummer, Beschikkingsnummer, Factuurnummer).
+    3. Het bedrag.
+    4. De instantie (Gemeente, CJIB, Belastingdienst).
     
     Output in Markdown:
-    # [Korte, duidelijke titel]
+    # [Korte titel: Instantie + Onderwerp]
     
-    ### 🚨 Urgentie & Actie
-    * **Urgentie:** [HOOG/MIDDEN/LAAG]
-    * **Deadline:** [Datum of "Geen"]
-    * **Kosten:** € [Bedrag of "0"]
+    ### 🚨 Analyse
+    * **Urgentie:** [HOOG/LAAG]
+    * **Deadline:** [Datum + dagen resterend]
+    * **Te betalen:** € [Bedrag]
     
     ### 📄 Samenvatting
-    [Eén heldere alinea wat dit document is]
+    [Eén alinea uitleg wat ze van de gebruiker willen]
     
     ### 💡 Qubikai Advies
-    [Jouw concrete advies: Betalen, Bewaren of Bezwaar maken?]
+    [Betaal direct / Vraag betalingsregeling / Maak bezwaar]
     """
     try:
         response = client.chat.completions.create(
@@ -144,19 +150,21 @@ def agent_analyze(base64_image):
     except Exception as e:
         return f"Fout: {e}"
 
-# --- AGENT 2: DE JURIST (Pakt de estafette stok over) ---
+# --- AGENT 2: DE ADVOCAAT (Schrijft de brief) ---
 def agent_write_letter(analysis_text):
     prompt = f"""
-    Jij bent een Juridisch Expert.
+    Jij bent een Senior Jurist Bestuursrecht.
+    Schrijf een formeel **Pro-forma Bezwaarschrift** op basis van de analyse hieronder.
     
-    TAAK:
-    Schrijf een formeel **Bezwaarschrift** (of verzoekschrift) op basis van de onderstaande analyse.
-    De gebruiker vult zelf zijn naam en adres in, gebruik daar placeholders voor: [NAAM], [ADRES].
-    
-    INFORMATIE UIT ANALYSE:
+    CONTEXT UIT ANALYSE:
     {analysis_text}
     
-    Schrijf de brief in correct, formeel Nederlands. Wees beleefd maar duidelijk.
+    INSTRUCTIES:
+    1. Schrijf in correct, formeel Nederlands.
+    2. Verwijs naar de Algemene wet bestuursrecht (Awb) waar relevant (bijv. termijn).
+    3. Gebruik placeholders voor de gebruiker: [UW NAAM], [UW ADRES], [DATUM].
+    4. Zorg dat het kenmerknummer (indien gevonden in de analyse) in de "Betreft" regel staat.
+    5. Vraag om opschorting van betaling tijdens de procedure.
     """
     try:
         response = client.chat.completions.create(
@@ -168,7 +176,7 @@ def agent_write_letter(analysis_text):
         return f"Fout: {e}"
 
 # ==========================================
-# 5. PAGINA'S 📱
+# 5. PAGINA'S & FLOW 📱
 # ==========================================
 
 # --- HEADER ---
@@ -208,7 +216,7 @@ elif st.session_state.page == 'upload':
 
 # --- PROCESSING (AGENT 1) ---
 elif st.session_state.page == 'processing':
-    with st.spinner('🕵️‍♂️ De kleine lettertjes lezen...'):
+    with st.spinner('🕵️‍♂️ Dossier aan het analyseren...'):
         image = Image.open(st.session_state.current_image)
         base64_img = encode_image(image)
         # Agent 1 aan het werk
@@ -223,6 +231,7 @@ elif st.session_state.page == 'result':
         img = Image.open(st.session_state.current_image)
         st.image(img, use_container_width=True, caption="Scan")
     with c_txt:
+        # Markdown fix
         st.markdown('<div class="result-card">', unsafe_allow_html=True)
         st.markdown(st.session_state.analysis_result)
         st.markdown('</div>', unsafe_allow_html=True)
@@ -232,32 +241,36 @@ elif st.session_state.page == 'result':
     
     c1, c2 = st.columns(2)
     with c1:
-        # HIER IS HET ESTAFETTE MOMENT!
+        # HIER ROEPEN WE AGENT 2 OP
         if st.button("✍️ Schrijf Bezwaarschrift"):
             st.session_state.page = 'writing'
             st.rerun()
     with c2:
         if st.button("✅ Ik regel het zelf"):
              st.success("Top! Succes.")
+             
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("🔄 Nieuwe Scan"):
+        st.session_state.page = 'home'
+        st.rerun()
 
 # --- WRITING (AGENT 2) ---
 elif st.session_state.page == 'writing':
     st.markdown("### ✍️ De Jurist is bezig...")
     
-    # Als we nog geen brief hebben, laat Agent 2 werken
     if not st.session_state.generated_letter:
-        with st.spinner("Concept opstellen..."):
+        with st.spinner("Wetten en regels checken..."):
             # Agent 2 pakt de analyse van Agent 1
             brief = agent_write_letter(st.session_state.analysis_result)
             st.session_state.generated_letter = brief
     
-    # Toon de brief in een "Papier" look (zwarte tekst op wit)
+    # Toon brief
     st.markdown('<div class="letter-paper">', unsafe_allow_html=True)
     st.markdown(st.session_state.generated_letter)
     st.markdown('</div>', unsafe_allow_html=True)
     
     st.markdown("<br>", unsafe_allow_html=True)
-    st.info("💡 Tip: Kopieer de tekst en plak hem in Word of je mail.")
+    st.info("💡 Tip: Selecteer de tekst hierboven, kopieer en plak in Word.")
     
     if st.button("🔄 Begin Opnieuw"):
         st.session_state.analysis_result = ""
