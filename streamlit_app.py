@@ -4,51 +4,77 @@ from PIL import Image
 import base64
 import io
 
-# 1. SETUP
-st.set_page_config(page_title="Qubikai Debug", page_icon="🐞")
+# 1. SETUP & STYLING 🎨
+st.set_page_config(page_title="Qubikai Brief", page_icon="📩")
 
-# Styling
 st.markdown("""
 <style>
     .stApp {background-color: #FFFFFF;} 
-    div.stButton > button {background-color: #FF4B4B; color: white; width: 100%; border-radius: 8px;}
+    /* Maak de status-balkjes mooi Qubikai-paars/blauw */
+    div.stSpinner > div {border-top-color: #4B0082 !important;}
+    /* Titel styling */
+    h1 {color: #111827; font-family: 'Montserrat', sans-serif;}
 </style>
 """, unsafe_allow_html=True)
 
-# 2. CONFIGURATIE CHECK
-if "OPENAI_API_KEY" not in st.secrets:
-    st.error("⚠️ CRITICAAL: Geen OPENAI_API_KEY in Secrets gevonden!")
-    st.stop()
-
+# 2. CONFIGURATIE (De Motor) ⚙️
 try:
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-except Exception as e:
-    st.error(f"⚠️ Fout bij starten OpenAI client: {e}")
+except:
+    st.error("⚠️ Systeemfout: API Key ontbreekt. Check de settings.")
     st.stop()
 
 def encode_image(image):
+    """Zet plaatje om naar leesbare code voor de AI"""
     buffered = io.BytesIO()
     image.save(buffered, format="JPEG")
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-# 3. INTERFACE
-st.title("🐞 Brief App (Debug Modus)")
-st.warning("Deze versie laat ruwe data zien om de fout te vinden.")
+# 3. INTERFACE (Het Gezicht) 📱
+st.title("📩 Snap-mijn-Brief")
+st.write("Brief van de overheid of een ingewikkelde rekening? Upload hem hieronder. Ik vertel je in gewone mensentaal wat je moet doen.")
 
-uploaded_file = st.file_uploader("Kies bestand", type=['jpg', 'jpeg', 'png'])
+uploaded_file = st.file_uploader("Maak een foto of kies een bestand", type=['jpg', 'jpeg', 'png'])
 
-# 4. DE LOGICA
+# 4. DE INTELLIGENTIE (De Agent) 🧠
 if uploaded_file:
+    # Toon de foto netjes (niet te groot)
     image = Image.open(uploaded_file)
-    st.image(image, width=250, caption="Jouw upload")
+    st.image(image, width=300, caption="Jouw document")
     
-    with st.spinner('OpenAI aanroepen...'):
+    st.markdown("---")
+    
+    # Start de analyse automatisch
+    with st.spinner('🔍 Brief lezen en kleine lettertjes checken...'):
         try:
             base64_image = encode_image(image)
             
-            # Simpele test prompt om zeker te weten dat hij reageert
-            prompt_text = "Beschrijf heel kort wat je op deze afbeelding ziet. Als je niets ziet, zeg dat dan."
-
+            # --- JOUW AGENT SCRIPT ---
+            prompt_text = """
+            Jij bent de bureaucratie-expert van Qubikai. Je helpt mensen die post niet snappen.
+            Analyseer de afbeelding grondig (zoek naar datums, bedragen, afzenders en juridische taal).
+            
+            Geef je antwoord EXACT in dit format (gebruik de Markdown opmaak):
+            
+            ### 📄 1. Wat is dit?
+            (Eén zin in simpele taal. Bijvoorbeeld: "Dit is een verkeersboete voor te hard rijden.")
+            
+            ### 🚨 2. Moet ik iets doen?
+            * **Actie:** [JA / NEE]
+            * **Urgentie:** [HOOG / GEMIDDELD / LAAG]
+            * **Deadline:** [Datum indien gevonden, anders "Geen harde datum"]
+            
+            ### 💶 3. Kosten?
+            (Staat er een bedrag? Zo ja: Hoeveel? Zo nee: "Geen kosten")
+            
+            ### 📝 4. Samenvatting
+            (De 3 belangrijkste punten in bulletpoints)
+            
+            ### 💡 5. Qubikai Advies
+            (Een vriendelijk, praktisch advies: "Betaal voor vrijdag via iDeal" of "Bewaar dit in je map".)
+            """
+            
+            # De aanroep naar het slimme model
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
@@ -65,20 +91,14 @@ if uploaded_file:
                         ],
                     }
                 ],
-                max_tokens=300,
+                max_tokens=600,
             )
             
-            # --- DEBUG INFO ---
+            # Resultaat tonen
             full_response = response.choices[0].message.content
-            
-            if not full_response:
-                st.error("❌ OpenAI stuurde een LEEG antwoord terug!")
-                st.write("Ruwe response object:", response)
-            else:
-                st.success("✅ Antwoord ontvangen!")
-                st.markdown("### Het resultaat:")
-                st.info(full_response)
-                
+            st.success("✅ Analyse voltooid!")
+            st.markdown(full_response)
+
         except Exception as e:
-            st.error("❌ CRASH tijdens aanroep:")
-            st.code(e)
+            st.error("Oeps, er ging iets mis bij de verwerking.")
+            st.info(f"Technische melding: {e}")
