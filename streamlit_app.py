@@ -3,62 +3,61 @@ from openai import OpenAI
 from PIL import Image
 import base64
 import io
+import os
 
-# 1. SETUP & CONFIGURATIE ⚙️
-st.set_page_config(page_title="Qubikai Brief", page_icon="📩", layout="centered")
+# 1. PAGE CONFIG (Breedbeeld & Titel)
+st.set_page_config(
+    page_title="Qubikai Brief Assistant",
+    page_icon="📩",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# --- DE DARK MODE STYLING ---
-# We maken een strakke, donkere interface.
+# 2. STYLING (De 'Pro' Look)
 st.markdown("""
 <style>
-    /* 1. De Hoofdachtergrond: Donker (Qubikai Dark) */
+    /* Hoofdachtergrond */
     .stApp {
-        background-color: #111827 !important;
-        color: #FFFFFF !important;
+        background-color: #0E1117;
+        color: #FAFAFA;
     }
     
-    /* 2. Alle tekst wit maken */
-    p, h1, h2, h3, h4, h5, h6, li, span, div, label {
-        color: #FFFFFF !important;
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background-color: #161B22;
+        border-right: 1px solid #30363D;
     }
     
-    /* 3. De Upload Box mooi maken (zodat tekst leesbaar is) */
-    div[data-testid="stFileUploader"] {
+    /* Knoppen */
+    div.stButton > button {
+        background-color: #FF4B4B;
+        color: white;
+        border-radius: 8px;
+        padding: 0.6rem 1rem;
+        border: none;
+        width: 100%;
+        font-weight: 600;
+    }
+    div.stButton > button:hover {
+        background-color: #D93838;
+    }
+    
+    /* Resultaat Blokken */
+    .result-card {
         background-color: #1F2937;
         padding: 20px;
-        border-radius: 12px;
-        border: 1px dashed #4B0082;
-    }
-    
-    /* 4. De Knoppen (Rood accent) */
-    div.stButton > button {
-        background-color: #FF4B4B !important; 
-        color: white !important;
-        font-weight: bold;
-        border: none;
-        border-radius: 8px;
-        padding: 0.5rem 1rem;
-    }
-    
-    /* 5. De Spinner (Laden) */
-    div.stSpinner > div {
-        border-top-color: #FF4B4B !important;
-    }
-    
-    /* 6. Success meldingen stylen */
-    div.stAlert {
-        background-color: #1F2937 !important;
-        color: white !important;
-        border: 1px solid #059669;
+        border-radius: 10px;
+        border-left: 5px solid #FF4B4B;
+        margin-bottom: 20px;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# 2. OPENAI VERBINDING 🔌
+# 3. SETUP
 try:
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 except:
-    st.error("⚠️ Setup Fout: Geen API Key gevonden.")
+    st.error("⚠️ Geen API Key gevonden. Check je Secrets.")
     st.stop()
 
 def encode_image(image):
@@ -66,70 +65,105 @@ def encode_image(image):
     image.save(buffered, format="JPEG")
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-# 3. DE INTERFACE (Voorkant) 📱
-st.title("📩 Snap-mijn-Brief")
-st.write("Upload een foto van je brief. Ik analyseer hem direct.")
+# --- 4. DE LAYOUT ---
 
-# Upload vak
-uploaded_file = st.file_uploader("Kies foto of maak een nieuwe", type=['jpg', 'jpeg', 'png'])
+with st.sidebar:
+    # --- LOGO CHECK ---
+    # Hij kijkt of 'logo.png' bestaat. Zo ja, laat hij hem zien.
+    if os.path.exists("logo.png"):
+        st.image("logo.png", width=180)
+    else:
+        # Geen logo? Dan tekst.
+        st.header("Qubikai 📩")
 
-# 4. DE INTELLIGENTIE (Agent) 🧠
-if uploaded_file:
-    # Toon de foto
-    image = Image.open(uploaded_file)
-    st.image(image, caption="Jouw upload", width=300)
+    st.markdown("---")
+    st.markdown("### 1. Upload Document")
+    uploaded_file = st.file_uploader("Sleep bestand of kies foto", type=['jpg', 'jpeg', 'png'])
+    
+    st.info("💡 Tip: Zorg voor goed licht als je een foto maakt.")
     
     st.markdown("---")
-    
-    with st.spinner('🚀 Bezig met analyseren...'):
-        try:
-            base64_image = encode_image(image)
-            
-            # De Qubikai Agent Prompt
-            prompt_text = """
-            Jij bent de bureaucratie-expert van Qubikai.
-            Bekijk de afbeelding en geef antwoord in dit exacte format (gebruik Markdown):
-            
-            ### 📄 1. Wat is dit?
-            (Eén duidelijke zin)
-            
-            ### 🚨 2. Actie & Deadline
-            * **Actie nodig:** [JA / NEE]
-            * **Urgentie:** [HOOG / GEMIDDELD / LAAG]
-            * **Deadline:** [Datum of "Geen datum"]
-            
-            ### 💶 3. Kosten
-            (Bedrag of "Geen kosten")
-            
-            ### 💡 4. Qubikai Advies
-            (Kort, praktisch advies wat ik nu moet doen)
-            """
-            
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt_text},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{base64_image}"
-                                }
-                            }
-                        ],
-                    }
-                ],
-                max_tokens=500,
-            )
-            
-            full_response = response.choices[0].message.content
-            
-            # Resultaat tonen
-            st.success("Analyse voltooid!")
-            st.markdown(full_response)
+    st.caption("🔒 Qubikai Privacy: Je data wordt niet opgeslagen.")
 
-        except Exception as e:
-            st.error("Oeps, er ging iets mis.")
-            st.info(f"Foutmelding: {e}")
+# --- HOOFDSCHERM ---
+
+if not uploaded_file:
+    # Welkomstscherm
+    st.title("Welkom bij Snap-mijn-Brief 👋")
+    st.markdown("""
+    Geen stress meer over post. 
+    Upload je brief in de zijbalk (links) en ik vertel je direct:
+    
+    * 📄 Wat het is
+    * 🚨 Of er haast bij is
+    * 💶 Wat het kost
+    """)
+
+if uploaded_file:
+    # Indeling: 2 kolommen
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.subheader("Jouw Bestand")
+        image = Image.open(uploaded_file)
+        st.image(image, use_column_width=True)
+    
+    with col2:
+        st.subheader("🕵️‍♂️ Analyse")
+        
+        with st.spinner('Kleine lettertjes lezen...'):
+            try:
+                base64_image = encode_image(image)
+                
+                # De Agent
+                prompt_text = """
+                Je bent de Qubikai Post-Expert.
+                Scan dit document en geef output in Markdown.
+                
+                Ik wil 4 duidelijke blokken:
+                ### 📄 1. Wat is dit?
+                (Korte titel/zin)
+                
+                ### 🚨 2. Actie & Deadline
+                * **Actie:** [JA/NEE] - [Wat?]
+                * **Deadline:** [Datum]
+                
+                ### 💶 3. Kosten
+                (Bedrag of "Geen")
+                
+                ### 💡 4. Advies
+                (Jip-en-janneke uitleg wat ik moet doen)
+                """
+                
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt_text},
+                                {
+                                    "type": "image_url",
+                                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
+                                }
+                            ]
+                        }
+                    ],
+                    max_tokens=500,
+                )
+                
+                result = response.choices[0].message.content
+                
+                # Toon resultaat in mooie kaart
+                st.markdown(f'<div class="result-card">{result}</div>', unsafe_allow_html=True)
+                
+                # Dummy knoppen
+                b1, b2 = st.columns(2)
+                with b1:
+                    st.button("📅 Zet in Agenda")
+                with b2:
+                    st.button("📧 Delen")
+                
+            except Exception as e:
+                st.error("Er ging iets mis.")
+                st.code(e)
