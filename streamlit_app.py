@@ -27,7 +27,7 @@ except:
 
 # KIES JE MODEL (Precies zoals in jouw lijstje!)
 # We pakken Flash voor snelheid. Wil je slimmer? Verander in 'models/gemini-1.5-pro-latest'
-model = genai.GenerativeModel('models/gemini-1.5-flash')
+model = genai.GenerativeModel('models/gemini-pro')
 
 # 3. INTERFACE
 st.title("📩 Snap-mijn-Brief")
