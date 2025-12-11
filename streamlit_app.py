@@ -7,47 +7,24 @@ import os
 import datetime
 
 # ==========================================
-# 1. APP SETTINGS (Jouw Huisstijl Schuifjes) 🎛️
+# 1. APP INSTELLINGEN (Jouw Huisstijl) 🎨
 # ==========================================
-# PAS DIT AAN PER APP:
 APP_TITLE = "Snap-mijn-Brief"
 APP_ICON = "📩"
-APP_PRIMARY_COLOR = "#FF4B4B"  # Rood voor Brief. (Gebruik #0078D7 voor Verf)
-APP_BG_COLOR = "#0E1117"       # Corporate Dark
-APP_TEXT_COLOR = "#FAFAFA"     # Corporate White
-
-# DE "AGENT" (Het Brein van deze specifieke app)
-def get_agent_prompt():
-    return """
-    Jij bent de Post-Expert van Qubikai.
-    Bekijk de afbeelding. Geef antwoord in strak Markdown format.
-    
-    Output structuur:
-    # [Korte, pakkende titel van het document]
-    
-    ### 🚨 Actie & Urgentie
-    * **Urgentie:** [HOOG/MIDDEN/LAAG]
-    * **Deadline:** [Datum of "Geen datum gevonden"]
-    * **Kosten:** [Bedrag of "Geen"]
-    
-    ### 📄 Wat is dit?
-    [Eén duidelijke zin uitleg in jip-en-janneke taal]
-    
-    ### 💡 Qubikai Advies
-    [Jouw concrete advies: Betalen, Bezwaar maken, of Archiveren?]
-    """
+APP_PRIMARY_COLOR = "#FF4B4B"  # Rood accent
+APP_BG_COLOR = "#0E1117"       # Donkere achtergrond
+APP_TEXT_COLOR = "#FAFAFA"     # Witte tekst
 
 # ==========================================
-# 2. CONFIGURATIE & CSS (Het Fundament) 🏗️
+# 2. CONFIGURATIE & CSS 🛠️
 # ==========================================
 st.set_page_config(page_title=f"Qubikai - {APP_TITLE}", page_icon=APP_ICON, layout="centered")
 
-# Hier laden we het 'Montserrat' lettertype in voor die strakke website-look
 st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap');
 
-    /* ALGEMEEN */
+    /* Algemene Stijl */
     html, body, [class*="css"] {{
         font-family: 'Montserrat', sans-serif;
     }}
@@ -56,7 +33,7 @@ st.markdown(f"""
         color: {APP_TEXT_COLOR};
     }}
     
-    /* NAVIGATIE BALK */
+    /* Navigatie Balk */
     .nav-bar {{
         padding: 15px;
         background-color: #161B22;
@@ -67,21 +44,11 @@ st.markdown(f"""
         font-weight: 700;
         font-size: 1.3em;
         letter-spacing: 1px;
-        border-left: 6px solid {APP_PRIMARY_COLOR}; /* De App-Kleur */
+        border-left: 6px solid {APP_PRIMARY_COLOR};
         box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }}
     
-    /* RESULTAAT KAARTEN */
-    .history-card {{
-        background-color: #1F2937;
-        padding: 15px;
-        border-radius: 8px;
-        margin-bottom: 12px;
-        border-left: 4px solid {APP_PRIMARY_COLOR};
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }}
-    
-    /* KNOPPEN */
+    /* Knoppen */
     .stButton > button {{
         width: 100%;
         border-radius: 8px;
@@ -93,7 +60,6 @@ st.markdown(f"""
         transition: 0.3s;
         text-transform: uppercase;
         font-size: 0.9em;
-        letter-spacing: 0.5px;
     }}
     .stButton > button:hover {{
         background-color: {APP_PRIMARY_COLOR};
@@ -101,20 +67,31 @@ st.markdown(f"""
         transform: translateY(-2px);
     }}
     
-    /* DETAILS (Uitklap tekst) */
-    details > summary {{
-        list-style: none;
-        cursor: pointer;
-        font-weight: 600;
-        color: {APP_PRIMARY_COLOR};
+    /* Resultaat Kaarten */
+    .result-box {{
+        background-color: #1F2937;
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 4px solid {APP_PRIMARY_COLOR};
+        margin-top: 20px;
+    }}
+
+    /* Geschiedenis Kaarten */
+    .history-card {{
+        background-color: #1F2937;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+        border-left: 4px solid {APP_PRIMARY_COLOR};
     }}
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 3. GEHEUGEN & LOGICA 🧠
+# 3. SETUP & GEHEUGEN 🧠
 # ==========================================
 
+# Sessie status initialiseren (zodat hij onthoudt waar je bent)
 if "step" not in st.session_state:
     st.session_state.step = "home"
 if "history" not in st.session_state:
@@ -126,8 +103,12 @@ if "current_analysis" not in st.session_state:
 try:
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 except:
-    st.error("⚠️ Geen API Key. Check je Secrets!")
+    st.error("⚠️ CRITICAAL: Geen API Key gevonden in Secrets!")
     st.stop()
+
+# ==========================================
+# 4. HULPFUNCTIES
+# ==========================================
 
 def nav_to(step_name):
     st.session_state.step = step_name
@@ -142,8 +123,29 @@ def add_to_history(title, advice):
     timestamp = datetime.datetime.now().strftime("%d-%m %H:%M")
     st.session_state.history.append({"time": timestamp, "title": title, "advice": advice})
 
+# --- DE INTELLIGENTIE (Prompt) ---
+def get_agent_prompt():
+    return """
+    Jij bent de Post-Expert van Qubikai.
+    Bekijk de afbeelding. Geef antwoord in strak Markdown format.
+    
+    Output structuur:
+    # [Bedenk een korte, duidelijke titel]
+    
+    ### 🚨 Actie & Urgentie
+    * **Urgentie:** [HOOG/MIDDEN/LAAG]
+    * **Deadline:** [Datum of "Geen datum"]
+    * **Kosten:** [Bedrag of "Geen"]
+    
+    ### 📄 Wat is dit?
+    [Eén duidelijke zin uitleg in jip-en-janneke taal]
+    
+    ### 💡 Qubikai Advies
+    [Jouw concrete advies: Wat is de slimste volgende stap?]
+    """
+
 # ==========================================
-# 4. DE INTERFACE (Schermen) 📱
+# 5. DE INTERFACE (De Schermen) 📱
 # ==========================================
 
 # --- HEADER (Altijd zichtbaar) ---
@@ -152,25 +154,46 @@ with c1:
     if st.button("🏠", help="Terug naar Home"):
         nav_to("home")
 with c2:
-    # De titelbalk pakt automatisch de APP_TITLE
     st.markdown(f"<div class='nav-bar'>{APP_TITLE}</div>", unsafe_allow_html=True)
 with c3:
     if len(st.session_state.history) > 0:
         if st.button("📂", help="Geschiedenis"):
             nav_to("history")
 
-# --- SCHERM 1: HOME ---
+# --- SCHERM 1: HOME (Met Uitleg) ---
 if st.session_state.step == "home":
-    st.markdown("### Welkom 👋")
-    st.write("Upload je document. Ik analyseer de inhoud, deadlines en acties.")
-    
-    st.markdown("---")
-    
-    # Grote Startknop
-    c_start, _ = st.columns([1, 0.01])
-    with c_start:
-        if st.button(f"📸  Start Nieuwe Scan"):
+    # Logo check
+    if os.path.exists("logo.png"):
+        c_l, c_r = st.columns([1, 4])
+        with c_l: st.image("logo.png", width=80)
+        with c_r: st.markdown("## Geen paniek over post.")
+    else:
+        st.markdown("<h2 style='text-align: center;'>Geen paniek over post. 📮</h2>", unsafe_allow_html=True)
+        
+    st.write("<div style='text-align: center; color: #ccc; margin-bottom: 20px;'>Ik vertaal ambtelijke taal naar actiepunten.</div>", unsafe_allow_html=True)
+
+    # De "Hoe werkt het?" Gids (Strakke UX)
+    with st.expander("ℹ️ Hoe werkt deze app?", expanded=True):
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown("#### 1. Upload")
+            st.caption("Maak een foto van je brief.")
+        with c2:
+            st.markdown("#### 2. Analyse")
+            st.caption("Ik zoek datums en bedragen.")
+        with c3:
+            st.markdown("#### 3. Advies")
+            st.caption("Jij krijgt een stappenplan.")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # De Grote Actieknop
+    c_left, c_btn, c_right = st.columns([1, 2, 1])
+    with c_btn:
+        if st.button("📸  SCAN MIJN BRIEF NU", type="primary"):
             nav_to("upload")
+            
+    st.markdown("<br><div style='text-align: center; font-size: 0.8em; color: #666;'>Veilig & Privé • Geen opslag van data</div>", unsafe_allow_html=True)
 
 # --- SCHERM 2: UPLOAD ---
 elif st.session_state.step == "upload":
@@ -183,7 +206,7 @@ elif st.session_state.step == "upload":
         nav_to("processing")
         
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🔙 Annuleren"):
+    if st.button("🔙 Terug"):
         nav_to("home")
 
 # --- SCHERM 3: PROCESSING ---
@@ -205,7 +228,7 @@ elif st.session_state.step == "processing":
             result_text = response.choices[0].message.content
             st.session_state.current_result = result_text
             
-            # Slimme titel extractie
+            # Titel uit het antwoord vissen voor geschiedenis
             first_line = result_text.split('\n')[0].replace('#', '').strip()
             if not first_line: first_line = "Document Scan"
             add_to_history(first_line, result_text)
@@ -219,7 +242,7 @@ elif st.session_state.step == "processing":
 
 # --- SCHERM 4: RESULTAAT ---
 elif st.session_state.step == "result":
-    # Linkerkolom: Foto, Rechterkolom: Tekst
+    # 2 kolommen: Links foto, rechts tekst
     c_img, c_txt = st.columns([1, 2])
     
     with c_img:
@@ -234,9 +257,9 @@ elif st.session_state.step == "result":
     
     col_a, col_b = st.columns(2)
     with col_a:
-        st.button("📅 Zet in Agenda (Demo)")
+        st.button("📅 Zet in Agenda")
     with col_b:
-        st.button("✉️ Delen / Mailen (Demo)")
+        st.button("✉️ Delen / Mailen")
         
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("📸 Volgende Scannen"):
@@ -245,6 +268,9 @@ elif st.session_state.step == "result":
 # --- SCHERM 5: GESCHIEDENIS ---
 elif st.session_state.step == "history":
     st.markdown("### 📂 Mijn Scans")
+    
+    if not st.session_state.history:
+        st.info("Nog geen scans gemaakt in deze sessie.")
     
     for item in reversed(st.session_state.history):
         st.markdown(f"""
@@ -255,7 +281,7 @@ elif st.session_state.step == "history":
             </div>
             <div style="font-weight:700; font-size:1.1em; margin: 5px 0;">{item['title']}</div>
             <details>
-                <summary>Toon Advies</summary>
+                <summary>Bekijk advies</summary>
                 <div style="margin-top: 10px; color: #ddd; font-size: 0.95em;">
                     {item['advice']}
                 </div>
