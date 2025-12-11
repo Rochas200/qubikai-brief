@@ -4,179 +4,231 @@ from PIL import Image
 import base64
 import io
 import os
+import datetime
 
-# 1. SETUP
+# ==========================================
+# 1. CONFIGURATIE & STYLING (Het Chassis) 🏎️
+# ==========================================
 st.set_page_config(page_title="Qubikai Brief", page_icon="📩", layout="centered")
 
-# 2. STYLING (Focus & Dark Mode)
 st.markdown("""
 <style>
-    /* Donkere achtergrond, alles gecentreerd */
+    /* Dark Mode Basis */
     .stApp {background-color: #0E1117; color: #FAFAFA;}
     
-    /* Knoppen styling (Groot & Duidelijk) */
+    /* Navigatie Balk */
+    .nav-bar {
+        padding: 15px;
+        background-color: #161B22;
+        border-bottom: 1px solid #30363D;
+        margin-bottom: 20px;
+        border-radius: 12px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 1.2em;
+        border-left: 5px solid #FF4B4B; /* Qubikai Rood Accent */
+    }
+    
+    /* Resultaat Kaarten */
+    .history-card {
+        background-color: #1F2937;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        border-left: 4px solid #FF4B4B;
+    }
+    
+    /* Knoppen */
     .stButton > button {
         width: 100%;
         border-radius: 8px;
-        height: 3em;
-        font-weight: bold;
+        font-weight: 600;
         border: none;
-        background-color: #1F2937; /* Standaard grijs */
+        padding: 0.5rem 1rem;
+        background-color: #21262d;
         color: white;
-        transition: 0.3s;
+        transition: 0.2s;
     }
     .stButton > button:hover {
-        background-color: #FF4B4B; /* Rood bij hover */
-        transform: scale(1.02);
-    }
-    
-    /* De 'Primaire' actie knoppen vallen meer op */
-    .primary-btn { border: 2px solid #FF4B4B !important; }
-
-    /* Containers */
-    .css-1r6slb0 {padding: 0;} /* Minder witruimte */
-    
-    /* Resultaat vak */
-    .advice-box {
-        background-color: #161B22;
-        padding: 20px;
-        border-radius: 10px;
-        border-left: 5px solid #FF4B4B;
-        margin-bottom: 20px;
+        background-color: #FF4B4B;
+        color: white;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# 3. FUNCTIES & STATE
-if "step" not in st.session_state:
-    st.session_state.step = 1 # We beginnen bij stap 1
-if "analysis" not in st.session_state:
-    st.session_state.analysis = ""
-if "letter_draft" not in st.session_state:
-    st.session_state.letter_draft = ""
+# ==========================================
+# 2. GEHEUGEN & VERBINDING 🧠
+# ==========================================
 
+if "step" not in st.session_state:
+    st.session_state.step = "home"
+if "history" not in st.session_state:
+    st.session_state.history = [] 
+if "current_analysis" not in st.session_state:
+    st.session_state.current_analysis = ""
+
+# API Check
 try:
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 except:
-    st.error("⚠️ API Key mist.")
+    st.error("⚠️ Geen API Key. Check je Secrets!")
     st.stop()
+
+# ==========================================
+# 3. HULPFUNCTIES 🛠️
+# ==========================================
+
+def nav_to(step_name):
+    st.session_state.step = step_name
+    st.rerun()
 
 def encode_image(image):
     buffered = io.BytesIO()
     image.save(buffered, format="JPEG")
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-def reset_app():
-    st.session_state.step = 1
-    st.session_state.analysis = ""
-    st.session_state.letter_draft = ""
-    st.rerun()
+def add_to_history(title, advice):
+    timestamp = datetime.datetime.now().strftime("%H:%M")
+    st.session_state.history.append({"time": timestamp, "title": title, "advice": advice})
 
-# --- HEADER (Altijd zichtbaar) ---
-col_logo, col_title = st.columns([1, 4])
-with col_logo:
-    if os.path.exists("logo.png"):
-        st.image("logo.png", width=80)
-    else:
-        st.write("📩")
-with col_title:
-    st.markdown("### Snap-mijn-Brief")
-
-st.markdown("---")
-
-# ==========================================
-# STAP 1: UPLOADEN (De enige taak)
-# ==========================================
-if st.session_state.step == 1:
-    st.markdown("### 1. Wat heb je ontvangen?")
-    st.write("Maak een foto of upload de brief. Ik vertel je wat je moet doen.")
+# --- DE MOTOR (HIER ZIT DE INTELLIGENTIE) ---
+def get_agent_prompt():
+    """
+    Dit is de specifieke instructie voor de BRIEF APP.
+    Voor VerfBuddy veranderen we alleen dit stukje tekst.
+    """
+    return """
+    Jij bent de Post-Expert van Qubikai.
+    Bekijk de afbeelding. Geef antwoord in strak Markdown format.
     
-    uploaded_file = st.file_uploader("Kies bestand", type=['jpg', 'jpeg', 'png'], label_visibility="collapsed")
+    Output structuur:
+    # [Bedenk een korte titel van 3 woorden]
+    
+    ### 📄 Wat is dit?
+    [Eén zin uitleg in jip-en-janneke taal]
+    
+    ### 🚨 Actie & Deadline
+    * **Urgentie:** [HOOG/MIDDEN/LAAG]
+    * **Deadline:** [Datum of "Geen datum"]
+    * **Te betalen:** [Bedrag of "Niets"]
+    
+    ### 💡 Qubikai Advies
+    [Concreet advies: Betalen, Bewaren, of Bezwaar maken?]
+    """
+
+# ==========================================
+# 4. DE INTERFACE (De Schermen) 📱
+# ==========================================
+
+# --- BOVENBALK ---
+c1, c2, c3 = st.columns([1, 5, 1])
+with c1:
+    if st.button("🏠"):
+        nav_to("home")
+with c2:
+    st.markdown("<div class='nav-bar'>Snap-mijn-Brief</div>", unsafe_allow_html=True)
+with c3:
+    if len(st.session_state.history) > 0:
+        if st.button("📂"):
+            nav_to("history")
+
+# --- SCHERM 1: HOME ---
+if st.session_state.step == "home":
+    st.write("### Welkom 👋")
+    st.write("Heb je een ingewikkelde brief of boete?")
+    st.info("Upload hem hieronder, dan zoek ik uit wat je moet doen.")
+    
+    st.markdown("---")
+    
+    # Grote opvallende startknop
+    c_start, _ = st.columns([1, 0.1])
+    with c_start:
+        if st.button("📸  Start Nieuwe Scan"):
+            nav_to("upload")
+
+# --- SCHERM 2: UPLOAD ---
+elif st.session_state.step == "upload":
+    st.markdown("### Foto maken of uploaden")
+    
+    uploaded_file = st.file_uploader("Kies bestand", label_visibility="collapsed")
     
     if uploaded_file:
-        # Opslaan en door naar stap 2
-        st.session_state.uploaded_file = uploaded_file
-        st.session_state.step = 2
-        st.rerun()
+        st.session_state.current_image = uploaded_file
+        nav_to("processing")
+        
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("🔙 Terug"):
+        nav_to("home")
 
-# ==========================================
-# STAP 2: ANALYSE & KEUZE (Het Inzicht)
-# ==========================================
-elif st.session_state.step == 2:
-    # Toon klein de brief (zodat je weet waar het over gaat)
-    image = Image.open(st.session_state.uploaded_file)
-    st.image(image, caption="Jouw document", width=200)
-    
-    # Als we nog geen analyse hebben, maak die nu
-    if not st.session_state.analysis:
-        with st.spinner('🔍 Analyseren...'):
-            base64_image = encode_image(image)
-            prompt = """
-            Je bent Qubikai. Analyseer kort.
-            Output Markdown:
-            ### 📄 Wat is dit? (1 zin)
-            ### 🚨 Actie & Deadline (Kort)
-            ### 💡 Advies (Wat moet ik doen?)
-            """
+# --- SCHERM 3: PROCESSING (AI aan het werk) ---
+elif st.session_state.step == "processing":
+    # Leuke laad-animatie
+    with st.spinner('🕵️‍♂️ De kleine lettertjes lezen...'):
+        try:
+            image = Image.open(st.session_state.current_image)
+            base64_img = encode_image(image)
+            
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=[{"role": "user", "content": [{"type": "text", "text": prompt}, {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}]}]
+                messages=[
+                    {"role": "user", "content": [
+                        {"type": "text", "text": get_agent_prompt()},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_img}"}}
+                    ]}
+                ]
             )
-            st.session_state.analysis = response.choices[0].message.content
-    
-    # Toon Resultaat
-    st.markdown(f'<div class="advice-box">{st.session_state.analysis}</div>', unsafe_allow_html=True)
-    
-    st.markdown("### 👉 Wat wil je doen?")
-    
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        if st.button("✍️ Schrijf Bezwaar"):
-            st.session_state.action_type = "bezwaar"
-            st.session_state.step = 3
-            st.rerun()
-    with c2:
-        if st.button("📧 Vraag Uitstel"):
-            st.session_state.action_type = "uitstel"
-            st.session_state.step = 3
-            st.rerun()
-    with c3:
-        if st.button("🔙 Nieuwe Upload"):
-            reset_app()
-
-# ==========================================
-# STAP 3: DE ACTIE (De Brief Generator)
-# ==========================================
-elif st.session_state.step == 3:
-    st.markdown(f"### ✍️ Concept: {st.session_state.action_type.capitalize()}")
-    
-    # Brief genereren (als nog niet gedaan)
-    if not st.session_state.letter_draft:
-        with st.spinner('Brief aan het schrijven...'):
-            # Hier zou je de AI vragen de brief te schrijven o.b.v. de analyse
-            # Voor nu een dummy tekst om de flow te testen
-            st.session_state.letter_draft = f"""
-Betreft: Bezwaar tegen beschikking [NUMMER]
-
-Geachte heer/mevrouw,
-
-Hierbij maak ik bezwaar tegen de ontvangen brief d.d. [DATUM].
-De reden hiervoor is dat de feiten niet kloppen.
-
-Met vriendelijke groet,
-[NAAM]
-            """
+            result_text = response.choices[0].message.content
+            st.session_state.current_result = result_text
             
-    # Toon de editor
-    txt = st.text_area("Pas de tekst aan indien nodig:", value=st.session_state.letter_draft, height=300)
+            # Slimme titel extractie voor geschiedenis
+            first_line = result_text.split('\n')[0].replace('#', '').strip()
+            add_to_history(first_line, result_text)
+            
+            nav_to("result")
+            
+        except Exception as e:
+            st.error(f"Fout: {e}")
+            if st.button("Opnieuw proberen"):
+                nav_to("upload")
+
+# --- SCHERM 4: RESULTAAT ---
+elif st.session_state.step == "result":
+    # Toon foto klein links
+    img = Image.open(st.session_state.current_image)
+    st.image(img, width=150)
     
-    # Actie Knoppen
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.button("✅ Versturen (Demo)") # Doet nu niks
-    with c2:
-        st.button("💾 Opslaan")
-    with c3:
-        if st.button("🔙 Terug"):
-            st.session_state.step = 2
-            st.rerun()
+    st.markdown("---")
+    # Het advies in een mooi kader
+    st.markdown(st.session_state.current_result)
+    st.markdown("---")
+    
+    st.write("### Wat wil je doen?")
+    
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.button("📅 In Agenda (Demo)")
+    with col_b:
+        st.button("✉️ Delen (Demo)")
+        
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("📸 Volgende Brief Scannen"):
+        nav_to("upload")
+
+# --- SCHERM 5: GESCHIEDENIS ---
+elif st.session_state.step == "history":
+    st.markdown("### 📂 Eerder gescand")
+    
+    for item in reversed(st.session_state.history):
+        st.markdown(f"""
+        <div class="history-card">
+            <small style="color: #888">{item['time']}</small><br>
+            <strong>{item['title']}</strong>
+            <details>
+                <summary style="cursor: pointer; color: #FF4B4B;">Bekijk advies</summary>
+                <div style="margin-top: 10px; color: #ccc;">{item['advice']}</div>
+            </details>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    if st.button("🔙 Terug naar Home"):
+        nav_to("home")
