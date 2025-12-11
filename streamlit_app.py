@@ -4,20 +4,39 @@ from PIL import Image
 import base64
 import io
 
-# 1. SETUP & STYLING 🎨
+# 1. SETUP
 st.set_page_config(page_title="Qubikai Brief", page_icon="📩")
 
+# --- DE COLOR FIX ---
+# Hier dwingen we ZWART lettertype af op de WITTE achtergrond
 st.markdown("""
 <style>
-    .stApp {background-color: #FFFFFF;} 
-    /* Maak de status-balkjes mooi Qubikai-paars/blauw */
-    div.stSpinner > div {border-top-color: #4B0082 !important;}
-    /* Titel styling */
-    h1 {color: #111827; font-family: 'Montserrat', sans-serif;}
+    /* Forceer de hele app naar wit met donkere tekst */
+    .stApp {
+        background-color: #FFFFFF !important;
+    }
+    
+    /* Zorg dat alle tekst (paragrafen, koppen, lijstjes) donkergrijs zijn */
+    p, h1, h2, h3, h4, h5, h6, li, span, div, label {
+        color: #111827 !important;
+    }
+    
+    /* Zorg dat de spinner ook zichtbaar is */
+    div.stSpinner > div {
+        border-top-color: #4B0082 !important;
+    }
+    
+    /* Knoppen styling */
+    div.stButton > button {
+        background-color: #FF4B4B !important; 
+        color: white !important; 
+        border: none;
+        border-radius: 8px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# 2. CONFIGURATIE (De Motor) ⚙️
+# 2. CONFIGURATIE
 try:
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 except:
@@ -25,26 +44,23 @@ except:
     st.stop()
 
 def encode_image(image):
-    """Zet plaatje om naar leesbare code voor de AI"""
     buffered = io.BytesIO()
     image.save(buffered, format="JPEG")
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-# 3. INTERFACE (Het Gezicht) 📱
+# 3. INTERFACE
 st.title("📩 Snap-mijn-Brief")
 st.write("Brief van de overheid of een ingewikkelde rekening? Upload hem hieronder. Ik vertel je in gewone mensentaal wat je moet doen.")
 
 uploaded_file = st.file_uploader("Maak een foto of kies een bestand", type=['jpg', 'jpeg', 'png'])
 
-# 4. DE INTELLIGENTIE (De Agent) 🧠
+# 4. INTELLIGENTIE
 if uploaded_file:
-    # Toon de foto netjes (niet te groot)
     image = Image.open(uploaded_file)
     st.image(image, width=300, caption="Jouw document")
     
     st.markdown("---")
     
-    # Start de analyse automatisch
     with st.spinner('🔍 Brief lezen en kleine lettertjes checken...'):
         try:
             base64_image = encode_image(image)
@@ -54,7 +70,7 @@ if uploaded_file:
             Jij bent de bureaucratie-expert van Qubikai. Je helpt mensen die post niet snappen.
             Analyseer de afbeelding grondig (zoek naar datums, bedragen, afzenders en juridische taal).
             
-            Geef je antwoord EXACT in dit format (gebruik de Markdown opmaak):
+            Geef je antwoord EXACT in dit format (gebruik Markdown):
             
             ### 📄 1. Wat is dit?
             (Eén zin in simpele taal. Bijvoorbeeld: "Dit is een verkeersboete voor te hard rijden.")
@@ -74,7 +90,6 @@ if uploaded_file:
             (Een vriendelijk, praktisch advies: "Betaal voor vrijdag via iDeal" of "Bewaar dit in je map".)
             """
             
-            # De aanroep naar het slimme model
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
@@ -94,11 +109,10 @@ if uploaded_file:
                 max_tokens=600,
             )
             
-            # Resultaat tonen
             full_response = response.choices[0].message.content
+            
+            # Succes melding (ook styling force)
             st.success("✅ Analyse voltooid!")
-            st.markdown(full_response)
-
-        except Exception as e:
-            st.error("Oeps, er ging iets mis bij de verwerking.")
-            st.info(f"Technische melding: {e}")
+            
+            # Resultaat tonen
+            st.markdown(full_response
