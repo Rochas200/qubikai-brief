@@ -2,70 +2,61 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-# 1. SETUP
-st.set_page_config(page_title="Qubikai - Snap Brief", page_icon="📩")
+# --- DE QUBIKAI STANDAARD TEMPLATE v1.0 ---
 
-# Styling: Strak & Modern (Past bij je site)
+# 1. CONFIGURATIE & SETUP
+st.set_page_config(page_title="Qubikai App", page_icon="🚀")
+
+# Probeer de sleutel op te halen
+try:
+    # Zorg dat in je Secrets exact staat: GOOGLE_API_KEY = "..."
+    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+except Exception as e:
+    st.error("⚠️ Fout: Geen API Key gevonden. Check je Secrets!")
+    st.stop()
+
+# 2. HET BREIN (Hier pas je de Prompt aan!) 🧠
+def get_ai_response(image_input):
+    # Dit model is razendsnel en goedkoop
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    
+    # --- PLAK HIERONDER JOUW AI STUDIO PROMPT ---
+    system_prompt = """
+    Jij bent een expert. Bekijk de afbeelding en doe het volgende:
+    1. Wat is dit voor document?
+    2. Welke actie moet de gebruiker ondernemen?
+    3. Geef een korte samenvatting.
+    
+    Geef antwoord in helder Nederlands.
+    """
+    # --------------------------------------------
+    
+    response = model.generate_content([system_prompt, image_input])
+    return response.text
+
+# 3. DE INTERFACE (Het Lichaam) 📱
 st.markdown("""
 <style>
-    .stApp {background-color: #FFFFFF;}
-    div.stButton > button {
-        width: 100%;
-        background-color: #FF4B4B;
-        color: white;
-        border-radius: 8px;
-    }
+    .stApp {background-color: #FFFFFF;} 
+    div.stButton > button {background-color: #4B0082; color: white; width: 100%;}
 </style>
 """, unsafe_allow_html=True)
 
-# 2. CONFIGURATIE
-try:
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-except:
-    st.error("⚠️ Zet je GOOGLE_API_KEY in de Secrets!")
-    st.stop()
+st.title("Admin Assistant")
+st.write("Upload een foto. Krijg direct advies.")
 
-# KIES JE MODEL (Precies zoals in jouw lijstje!)
-# We pakken Flash voor snelheid. Wil je slimmer? Verander in 'models/gemini-1.5-pro-latest'
-model = genai.GenerativeModel('models/gemini-pro')
+uploaded_file = st.file_uploader("Kies een bestand...", type=["jpg", "png", "jpeg"])
 
-# 3. INTERFACE
-st.title("📩 Snap-mijn-Brief")
-st.write("Maak een foto van je brief. Ik vertel je direct wat je moet doen.")
-
-# Camera input voor mobiel gemak (of upload)
-uploaded_file = st.file_uploader("Kies foto of PDF", type=['jpg', 'jpeg', 'png'])
-
-# 4. LOGICA
-def analyze_image(img):
-    prompt = """
-    Jij bent de brief-expert van Qubikai. Analyseer deze afbeelding.
-    Geef antwoord in dit format:
-    
-    1. **WAT IS DIT?** (1 zin, jip-en-janneke taal)
-    2. **ACTIE NODIG?** (JA/NEE + Deadline)
-    3. **SAMENVATTING** (De 3 belangrijkste punten)
-    4. **ADVIES** (Stap voor stap wat ik nu moet doen)
-    
-    Wees kort en direct.
-    """
-    response = model.generate_content([prompt, img])
-    return response.text
-
-# 5. AUTO-PILOT ACTIE (Geen knop meer nodig!)
-if uploaded_file is not None:
-    # Toon de foto klein
+if uploaded_file:
+    # Toon foto
     image = Image.open(uploaded_file)
-    st.image(image, caption='Jouw bestand', width=200)
+    st.image(image, width=300)
     
-    # Direct starten
-    with st.spinner('✨ Gemini is aan het lezen...'):
+    # Draai de AI
+    with st.spinner('Thinking...'):
         try:
-            resultaat = analyze_image(image)
-            st.success("Analyse klaar!")
-            st.markdown("---")
+            resultaat = get_ai_response(image)
+            st.success("Klaar!")
             st.markdown(resultaat)
-            
         except Exception as e:
-            st.error("Oeps! Er ging iets mis.")
-            st.write(f"Technische fout: {e}")
+            st.error(f"Er ging iets mis: {e}")
