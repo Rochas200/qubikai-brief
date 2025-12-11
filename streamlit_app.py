@@ -5,7 +5,7 @@ import base64
 import io
 
 # 1. SETUP
-st.set_page_config(page_title="Qubikai Brief", page_icon="📩")
+st.set_page_config(page_title="Qubikai Debug", page_icon="🐞")
 
 # Styling
 st.markdown("""
@@ -15,49 +15,42 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 2. CONFIGURATIE
-try:
-    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-except:
-    st.error("⚠️ Zet je OPENAI_API_KEY in de Secrets!")
+# 2. CONFIGURATIE CHECK
+if "OPENAI_API_KEY" not in st.secrets:
+    st.error("⚠️ CRITICAAL: Geen OPENAI_API_KEY in Secrets gevonden!")
     st.stop()
 
-# Hulpfunctie: Afbeelding omzetten naar tekst voor OpenAI
+try:
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+except Exception as e:
+    st.error(f"⚠️ Fout bij starten OpenAI client: {e}")
+    st.stop()
+
 def encode_image(image):
     buffered = io.BytesIO()
     image.save(buffered, format="JPEG")
     return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
 # 3. INTERFACE
-st.title("📩 Snap-mijn-Brief")
-st.write("Upload je brief. Direct advies.")
+st.title("🐞 Brief App (Debug Modus)")
+st.warning("Deze versie laat ruwe data zien om de fout te vinden.")
 
-uploaded_file = st.file_uploader("Maak een foto of kies bestand", type=['jpg', 'jpeg', 'png'])
+uploaded_file = st.file_uploader("Kies bestand", type=['jpg', 'jpeg', 'png'])
 
-# 4. DE LOGICA (OpenAI GPT-4o-mini)
+# 4. DE LOGICA
 if uploaded_file:
-    # Toon plaatje
     image = Image.open(uploaded_file)
-    st.image(image, width=300)
+    st.image(image, width=250, caption="Jouw upload")
     
-    # Direct starten
-    with st.spinner('Analyseren...'):
+    with st.spinner('OpenAI aanroepen...'):
         try:
-            # Codeer plaatje
             base64_image = encode_image(image)
             
-            # De Prompt (Jouw Agent)
-            prompt_text = """
-            Jij bent de brief-expert van Qubikai. Analyseer deze afbeelding.
-            Geef antwoord in dit format:
-            1. **WAT IS DIT?** (1 zin)
-            2. **ACTIE NODIG?** (JA/NEE + Deadline)
-            3. **SAMENVATTING** (Kort)
-            4. **ADVIES** (Wat moet ik doen?)
-            """
+            # Simpele test prompt om zeker te weten dat hij reageert
+            prompt_text = "Beschrijf heel kort wat je op deze afbeelding ziet. Als je niets ziet, zeg dat dan."
 
             response = client.chat.completions.create(
-                model="gpt-4o-mini",  # Dit is het snelle, goedkope model!
+                model="gpt-4o-mini",
                 messages=[
                     {
                         "role": "user",
@@ -72,13 +65,20 @@ if uploaded_file:
                         ],
                     }
                 ],
-                max_tokens=500,
+                max_tokens=300,
             )
             
-            # Resultaat tonen
-            st.success("Klaar!")
-            st.markdown(response.choices[0].message.content)
-
+            # --- DEBUG INFO ---
+            full_response = response.choices[0].message.content
+            
+            if not full_response:
+                st.error("❌ OpenAI stuurde een LEEG antwoord terug!")
+                st.write("Ruwe response object:", response)
+            else:
+                st.success("✅ Antwoord ontvangen!")
+                st.markdown("### Het resultaat:")
+                st.info(full_response)
+                
         except Exception as e:
-            st.error("Er ging iets mis met OpenAI:")
+            st.error("❌ CRASH tijdens aanroep:")
             st.code(e)
